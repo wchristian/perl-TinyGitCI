@@ -1,0 +1,61 @@
+=pod
+
+=head1 NAME
+
+TinyGitCI - watch a git repo's remote for changes and test them
+
+=head1 VERSION
+
+version 1.250710
+
+=head1 SYNOPSIS
+
+    $ cat ~/.tinygitci :
+    {
+        minion     =>     # db to use, pg has better support, see Minion::Backend::*
+                          { mysql => 'mysql://tgci:tgci@xenwide/tgci' },
+        secrets    =>     # app salt for encrypted cookies, csrf, etc. change to a random value
+                          ['asdf'],
+        repos       =>    # repositories to watch and test, string or hash
+                          ["/path/to", {path=>"/path/to", remote => "outer"}],
+        fetch_secs => 60, # how often to check for new commits, defaults to 60
+        email      => 'email_we_send_from@example.com',
+    }
+    $ tinygitci minion worker &  # this one grabs tasks and executes them
+    $ tinygitci daemon &         # this one's the web interface
+
+=for :stopwords cpan testmatrix url bugtracker rt cpants kwalitee diff irc mailto metadata placeholders metacpan
+
+=head1 SUPPORT
+
+=head2 Bugs / Feature Requests
+
+Please report any bugs or feature requests through the issue tracker
+at L<https://github.com/wchristian/perl-TinyGitCI/issues>.
+You will be notified automatically of any progress on your issue.
+
+=head2 Source Code
+
+This is open source software.  The code repository is available for
+public review and contribution under the terms of the license.
+
+L<https://github.com/wchristian/perl-TinyGitCI>
+
+  git clone https://github.com/wchristian/perl-TinyGitCI.git
+
+=head1 AUTHOR
+
+Christian Walde <walde.christian@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+
+Christian Walde has dedicated the work to the Commons by waiving all of his
+or her rights to the work worldwide under copyright law and all related or
+neighboring legal rights he or she had in the work, to the extent allowable by
+law.
+
+Works under CC0 do not require attribution. When citing the work, you should
+not imply endorsement by the author.
+
+=cut

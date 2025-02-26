@@ -1,0 +1,6 @@
+--indent-columns=4
+--entab-leading-whitespace=4
+--tabs
+--maximum-line-length=100
+--noblanks-before-comments
+--converge

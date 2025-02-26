@@ -1,0 +1,15 @@
+#!/usr/bin/env perl
+
+package tinygitci;
+
+use strictures 2;
+
+use FindBin;
+BEGIN { unshift @INC, "$FindBin::Bin/../lib" }
+
+# ABSTRACT: watch a git repo's remote for changes and test them
+
+# VERSION
+
+require Mojolicious::Commands;
+Mojolicious::Commands->start_app('TinyGitCI');
