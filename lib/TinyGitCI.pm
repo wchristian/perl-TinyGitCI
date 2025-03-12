@@ -99,14 +99,21 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	return $self->reschedule( $job, "Previous test run is still active" ) unless           #
 	  my $guard = $m->guard( "test_commit_id_task$repo" => 86400 );
 
+	$job->note( last_state => "start" );
 	my ($test_log) = capture_merged {
 		chdir $repo or die "cannot chdir to $repo";
+		$job->note( last_state => "changed dir" );
 		Git::Wrapper->new($repo)->checkout($commit_id);
+		$job->note( last_state => "checked out commit" );
 		$ENV{AUTOMATED_TESTING} = $ENV{PERL_MM_USE_DEFAULT} = 1;
 		require CPAN;    # must be loaded after fork
+		$job->note( last_state => "loaded cpan module" );
 		CPAN::Index->reload;
+		$job->note( last_state => "loaded cpan index" );
 		CPAN::clean(".");
+		$job->note( last_state => "cleaned" );
 		CPAN::install(".");
+		$job->note( last_state => "installed" );
 	};
 	$job->note( test_log => [ split /\n/, $test_log ] );
 	my ($fail_list) = capture_merged { CPAN::Shell->failed };
