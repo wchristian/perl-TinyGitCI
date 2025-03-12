@@ -105,6 +105,7 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 		$ENV{AUTOMATED_TESTING} = $ENV{PERL_MM_USE_DEFAULT} = 1;
 		require CPAN;    # must be loaded after fork
 		CPAN::Index->reload;
+		CPAN::clean(".");
 		CPAN::install(".");
 	};
 	$job->note( test_log => [ split /\n/, $test_log ] );
