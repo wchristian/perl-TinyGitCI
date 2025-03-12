@@ -6,7 +6,7 @@ TinyGitCI - watch a git repo's remote for changes and test them
 
 =head1 VERSION
 
-version 1.250710
+version 1.250711
 
 =head1 SYNOPSIS
 

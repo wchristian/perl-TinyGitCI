@@ -107,7 +107,7 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 		CPAN::Index->reload;
 		CPAN::install(".");
 	};
-	$job->note( test_log => $test_log );
+	$job->note( test_log => [ split /\n/, $test_log ] );
 	my ($fail_list) = capture_merged { CPAN::Shell->failed };
 	my ( $meth, $res ) = $fail_list =~ /Nothing failed in this session/    #
 	  ? qw( finish PASS ) : qw( fail FAIL );

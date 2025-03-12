@@ -26,5 +26,12 @@
 % }
 
 <span>
+% if (ref $test_log eq 'ARRAY') {
+    % for my $line (@$test_log) {
+      %= $line
+    % }
+% }
+% else {
   %= $test_log
+% }
 </span>
