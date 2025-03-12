@@ -100,6 +100,7 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	  my $guard = $m->guard( "test_commit_id_task$repo" => 86400 );
 
 	$job->note( last_state => "start" );
+	my $e;
 	my ($test_log) = capture_merged {
 		chdir $repo or die "cannot chdir to $repo";
 		$job->note( last_state => "changed dir" );
@@ -112,12 +113,14 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 		$job->note( last_state => "loaded cpan index" );
 		CPAN::clean(".");
 		$job->note( last_state => "cleaned" );
-		CPAN::install(".");
+		eval { CPAN::install(".") };
+		$e = $@;
 		$job->note( last_state => "installed" );
 	};
-	$job->note( test_log => [ split /\n/, $test_log ] );
+	$job->note( test_log  => [ split /\n/, $test_log ] );
+	$job->note( error_log => [ split /\n/, $e // "" ] );
 	my ($fail_list) = capture_merged { CPAN::Shell->failed };
-	my ( $meth, $res ) = $fail_list =~ /Nothing failed in this session/    #
+	my ( $meth, $res ) = ( !$e and $fail_list =~ /Nothing failed in this session/ )    #
 	  ? qw( finish PASS ) : qw( fail FAIL );
 	$m->enqueue( send_email_task => [ $repo, $res, $test_log ] );
 	return $job->$meth($res);
@@ -127,7 +130,7 @@ sub send_email_task( $self, $job, $repo, $res, $text,
 	$email = $self->config->{email} || die "no email" )
 {
 	my $title     = "TinyGitCI result for $repo - $res";
-	my $email_obj = Email::Simple                                          #
+	my $email_obj = Email::Simple                                                      #
 	  ->create( header => [ To => $email, From => $email, Subject => $title ], body => $text );
 	die "error with email:\n" . dumper($email_obj) . "\n$@"
 	  unless eval { Email::Sender::Simple->send($email_obj); 1 };
