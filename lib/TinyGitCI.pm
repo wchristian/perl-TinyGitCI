@@ -106,7 +106,7 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 		$job->note( last_state => "changed dir" );
 		Git::Wrapper->new($repo)->checkout($commit_id);
 		$job->note( last_state => "checked out commit" );
-		$ENV{AUTOMATED_TESTING} = $ENV{PERL_MM_USE_DEFAULT} = 1;
+		$ENV{HARNESS_VERBOSE} = $ENV{AUTOMATED_TESTING} = $ENV{PERL_MM_USE_DEFAULT} = 1;
 		require CPAN;    # must be loaded after fork
 		$job->note( last_state => "loaded cpan module" );
 		CPAN::Index->reload;
