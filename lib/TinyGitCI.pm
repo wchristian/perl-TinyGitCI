@@ -122,15 +122,16 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	my ($fail_list) = capture_merged { CPAN::Shell->failed };
 	my ( $meth, $res ) = ( !$e and $fail_list =~ /Nothing failed in this session/ )    #
 	  ? qw( finish PASS ) : qw( fail FAIL );
-	$m->enqueue( send_email_task => [ $repo, $res, $test_log ] );
+	$m->enqueue( send_email_task => [ $repo, $res, $test_log, $commit_id ] );
 	return $job->$meth($res);
 }
 
-sub send_email_task( $self, $job, $repo, $res, $text,
+sub send_email_task( $self, $job, $repo, $res, $text, $commit_id,
 	$email = $self->config->{email} || die "no email" )
 {
-	my $title     = "TinyGitCI result for $repo - $res";
-	my $email_obj = Email::Simple                                                      #
+	my ($commit)  = Git::Wrapper->new($repo)->RUN( "show", "-s", '--format=%h : %s', $commit_id );
+	my $title     = "TinyGitCI result for $repo - $res - $commit";
+	my $email_obj = Email::Simple                                                                  #
 	  ->create( header => [ To => $email, From => $email, Subject => $title ], body => $text );
 	die "error with email:\n" . dumper($email_obj) . "\n$@"
 	  unless eval { Email::Sender::Simple->send($email_obj); 1 };
