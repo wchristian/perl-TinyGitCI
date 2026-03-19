@@ -13,6 +13,7 @@ use File::HomeDir ();
 use Email::Simple;
 use Email::Sender::Simple;
 use Devel::Confess;
+use Time::HiRes 'sleep';
 
 use TinyGitCI::Repo;
 
@@ -98,7 +99,7 @@ sub fetch_new_commit_id_task ( $self, $job, $repo, $remote ) {
 sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	my $m = $self->minion;
 	return $self->reschedule( $job, "Previous test run is still active" ) unless           #
-	  my $guard = $m->guard( "test_commit_id_task$repo" => 86400 );
+	  my $guard = $self->guard( "test_commit_id_task$repo" => 86400 );
 
 	$job->note( last_state => "start" );
 	my $e;
@@ -143,6 +144,26 @@ sub reschedule ( $self, $job, $msg ) {
 	$job->note( reschedule_reason => $msg );
 	$job->retry( { delay => 60 } );
 	return;
+}
+
+# all of this is necessary because: 1. workers run in separate processes
+# 2. sqlite seems to allow lock attempts to pass each other by
+#    https://metacpan.org/dist/Minion-Backend-SQLite/source/lib/Minion/Backend/SQLite.pm#L217
+# 3. the guard function does not return the id of the created guard
+sub guard ( $self, $name, $duration ) {
+	my $m = $self->minion;
+	return if $m->is_locked($name);    # allow blocked tasks to exit eary to not pollute ui
+	sleep 5 * rand;                    # make similarly scheduled tasks less likely to collide
+	return if $m->is_locked($name);
+	my $real_duration    = $duration + int( 256 * rand ); # randomize expiry so it can be recognized
+	my $expected_expires = time + $real_duration;
+	return unless                                         #
+	  my $guard = $m->guard( $name => $real_duration );
+	sleep 1;    # make sure we don't miss interference from other tasks
+	my $locks = $m->backend->list_locks( 0, 2, { names => [$name] } )->{locks};
+	return if @{$locks} != 1;                                      # should be exactly 1 lock
+	return if abs( $locks->[0]{expires} - $expected_expires ) > 3; # big diff => lock for wrong task
+	return $guard;                                                 # *probably* correct lock
 }
 
 1;
