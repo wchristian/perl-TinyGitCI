@@ -139,7 +139,7 @@ sub send_email_task( $self, $job, $repo, $res, $text, $commit_id,
 }
 
 sub reschedule ( $self, $job, $msg ) {
-	$job->note($msg);
+	$job->note( reschedule_reason => $msg );
 	$job->retry( { delay => 60 } );
 	return;
 }
