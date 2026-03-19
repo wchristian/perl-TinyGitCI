@@ -12,6 +12,7 @@ use Mojo::File    qw' curfile path ';
 use File::HomeDir ();
 use Email::Simple;
 use Email::Sender::Simple;
+use Devel::Confess;
 
 use TinyGitCI::Repo;
 
