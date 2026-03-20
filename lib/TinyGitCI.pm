@@ -76,8 +76,8 @@ sub queue_repo_fetch_task ( $self, $job ) {
 	  my $guard = $m->guard( queue_repo_fetch_task => 86400 );
 	my @queued;
 	for my $repo ( @{ $self->config->{repos} } ) {
-		next if not $m->guard( "fetch_new_commit_id_task" . $repo->path => 86400 );
-		next if not $m->guard( "test_commit_id_task" . $repo->path      => 86400 );
+		next if $m->is_locked( "fetch_new_commit_id_task" . $repo->path );
+		next if $m->is_locked( "test_commit_id_task" . $repo->path );
 		push @queued, $m->enqueue( fetch_new_commit_id_task => [ $repo->path, $repo->remote ] );
 	}
 	return $job->finish( "done, queued: " . @queued );
@@ -87,8 +87,8 @@ sub fetch_new_commit_id_task ( $self, $job, $repo, $remote ) {
 	my $m = $self->minion;
 	return $self->reschedule( $job, "Previous commit id fetch is still active" ) unless    #
 	  my $guard = $m->guard( "fetch_new_commit_id_task$repo" => 86400 );
-	return $self->reschedule( $job, "Test run still active" ) unless                       #
-	  $m->guard( "test_commit_id_task$repo" => 86400 );
+	return $self->reschedule( $job, "Test run still active" )
+	  if $m->is_locked("test_commit_id_task$repo");
 
 	chdir $repo or die "cannot chdir to $repo";
 	my @commits = fetch_new_commit_ids( Git::Wrapper->new($repo), $remote );
@@ -98,7 +98,7 @@ sub fetch_new_commit_id_task ( $self, $job, $repo, $remote ) {
 
 sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	my $m = $self->minion;
-	return $self->reschedule( $job, "Previous test run is still active" ) unless           #
+	return $self->reschedule( $job, "Previous test run is still active" ) unless    #
 	  my $guard = $self->guard( $job, "test_commit_id_task$repo" => 86400 );
 
 	$job->note( last_state => "start" );
