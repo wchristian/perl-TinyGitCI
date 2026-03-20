@@ -99,7 +99,7 @@ sub fetch_new_commit_id_task ( $self, $job, $repo, $remote ) {
 sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	my $m = $self->minion;
 	return $self->reschedule( $job, "Previous test run is still active" ) unless           #
-	  my $guard = $self->guard( "test_commit_id_task$repo" => 86400 );
+	  my $guard = $self->guard( $job, "test_commit_id_task$repo" => 86400 );
 
 	$job->note( last_state => "start" );
 	my $e;
@@ -150,20 +150,34 @@ sub reschedule ( $self, $job, $msg ) {
 # 2. sqlite seems to allow lock attempts to pass each other by
 #    https://metacpan.org/dist/Minion-Backend-SQLite/source/lib/Minion/Backend/SQLite.pm#L217
 # 3. the guard function does not return the id of the created guard
-sub guard ( $self, $name, $duration ) {
+sub guard ( $self, $j, $name, $duration ) {
+	my @l;
+	$self->update_log( $j, \@l, "guard start" );
 	my $m = $self->minion;
 	return if $m->is_locked($name);    # allow blocked tasks to exit eary to not pollute ui
+	$self->update_log( $j, \@l, "guard first log check passed" );
 	sleep 5 * rand;                    # make similarly scheduled tasks less likely to collide
 	return if $m->is_locked($name);
+	$self->update_log( $j, \@l, "guard second log check passed post sleep" );
 	my $real_duration    = $duration + int( 256 * rand ); # randomize expiry so it can be recognized
 	my $expected_expires = time + $real_duration;
 	return unless                                         #
 	  my $guard = $m->guard( $name => $real_duration );
+	$self->update_log( $j, \@l, "guard object acquired" );
 	sleep 1;    # make sure we don't miss interference from other tasks
 	my $locks = $m->backend->list_locks( 0, 2, { names => [$name] } )->{locks};
-	return if @{$locks} != 1;                                      # should be exactly 1 lock
+	return if @{$locks} != 1;    # should be exactly 1 lock
+	$self->update_log( $j, \@l, "guard count == 1" );
+	$self->update_log( $j, \@l, "guard expiry real: $locks->[0]{expires}, exp: $expected_expires" );
 	return if abs( $locks->[0]{expires} - $expected_expires ) > 3; # big diff => lock for wrong task
+	$self->update_log( $j, \@l, "guard expiry looks reasonable" );
 	return $guard;                                                 # *probably* correct lock
+}
+
+sub update_log( $self, $job, $job_log, $msg ) {
+	push @{$job_log}, "[" . time . "] $msg";
+	$job->note( job_log => $job_log );
+	return;
 }
 
 1;
