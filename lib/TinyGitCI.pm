@@ -13,7 +13,8 @@ use File::HomeDir ();
 use Email::Simple;
 use Email::Sender::Simple;
 use Devel::Confess;
-use Time::HiRes 'sleep';
+use Time::HiRes qw' sleep time ';
+use IO::All -binary;
 
 use TinyGitCI::Repo;
 
@@ -101,6 +102,7 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	my @l;
 	return $self->reschedule( $job, "Previous test run is still active" )
 	  if not $self->guard( \@l, $job, "test_commit_id_task$repo" => 86400 );
+	$self->update_log( $job, \@l, "guard allowed, running job" );
 
 	$job->note( last_state => "start" );
 	my $e;
@@ -127,7 +129,9 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	  ? qw( finish PASS ) : qw( fail FAIL );
 	$m->enqueue( send_email_task => [ $repo, $res, $test_log, $commit_id ] );
 	$job->$meth($res);
+	$self->update_log( $job, \@l, "guard unlocking" );
 	$m->unlock("test_commit_id_task$repo");
+	$self->update_log( $job, \@l, "guard unlocked" );
 	return;
 }
 
@@ -176,8 +180,9 @@ sub guard ( $self, $l, $j, $name, $duration ) {
 }
 
 sub update_log( $self, $job, $job_log, $msg ) {
-	push @{$job_log}, "[" . time . "] $msg";
+	push @{$job_log}, my $log_line = "[" . time . "] " . $job->id . " $msg";
 	$job->note( job_log => $job_log );
+	io("/tmp/tgci_worker.log")->append("$log_line\n");
 	return;
 }
 
