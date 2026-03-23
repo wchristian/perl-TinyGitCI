@@ -106,6 +106,7 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	  if not $self->guard( \@l, $job, "test_commit_id_task$repo" => 86400 );
 	$self->update_log( $job, \@l, "guard allowed, running job" );
 
+	$job->note( $_         => [] ) for qw( test_log error_log );
 	$job->note( last_state => "start" );
 	my $e;
 	my ($test_log) = capture_merged {
