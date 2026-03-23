@@ -15,6 +15,7 @@ use Email::Sender::Simple;
 use Devel::Confess;
 use Time::HiRes qw' sleep time ';
 use IO::All -binary;
+use Sys::SigAction 'timeout_call';
 
 use TinyGitCI::Repo;
 
@@ -106,9 +107,8 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	  if not $self->guard( \@l, $job, "test_commit_id_task$repo" => 86400 );
 	$self->update_log( $job, \@l, "guard allowed, running job" );
 
-	$job->note( $_         => [] ) for qw( test_log error_log );
+	$job->note( test_log   => [] );
 	$job->note( last_state => "start" );
-	my $e;
 	my ($test_log) = capture_merged {
 		chdir $repo or die "cannot chdir to $repo";
 		$job->note( last_state => "changed dir" );
@@ -118,20 +118,14 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 		$git->clean( { d => 1, f => 1, x => 1, ( e => $c->{keep_files} ) x !!$c->{keep_files} } );
 		$job->note( last_state => "checked out commit" );
 		$ENV{HARNESS_VERBOSE} = $ENV{AUTOMATED_TESTING} = $ENV{PERL_MM_USE_DEFAULT} = 1;
-		require CPAN;    # must be loaded after fork
-		$job->note( last_state => "loaded cpan module" );
-		CPAN::Index->reload;
-		$job->note( last_state => "loaded cpan index" );
-		CPAN::clean(".");
 		$job->note( last_state => "cleaned" );
-		eval { CPAN::install(".") };
-		$e = $@;
+		my $test_call =
+		  qq[perl -e 'use CPAN; CPAN::Index->reload; CPAN::clean("."); CPAN::install(".")'];
+		print "timed out\n" if timeout_call 30, sub { system $test_call };
 		$job->note( last_state => "installed" );
 	};
-	$job->note( test_log  => [ split /\n/, $test_log ] );
-	$job->note( error_log => [ split /\n/, $e // "" ] );
-	my ($fail_list) = capture_merged { CPAN::Shell->failed };
-	my ( $meth, $res ) = ( !$e and $fail_list =~ /Nothing failed in this session/ )    #
+	$job->note( test_log => [ split /\n/, $test_log ] );
+	my ( $meth, $res ) = ( $test_log =~ /Result: FAIL/ )    #
 	  ? qw( finish PASS ) : qw( fail FAIL );
 	$m->enqueue( send_email_task => [ $repo, $res, $test_log, $commit_id ] );
 	$job->$meth($res);
