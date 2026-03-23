@@ -15,6 +15,7 @@ use Email::Sender::Simple;
 use Devel::Confess;
 use Time::HiRes qw' sleep time ';
 use IO::All -binary;
+use Proc::Killfam 'killfam';
 
 use TinyGitCI::Repo;
 
@@ -34,6 +35,7 @@ use TinyGitCI::Repo;
                           ["/path/to", {path=>"/path/to", remote => "outer"}],
         keep_files  =>    # regex to keep in the repositories between test runs
                           "etc/config.yml",
+        timeout => 3600,  # how many seconds a test run can take, defaults to 3600
         fetch_secs => 60, # how often to check for new commits, defaults to 60
         email      => 'email_we_send_from@example.com',
     }
@@ -106,9 +108,9 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	  if not $self->guard( \@l, $job, "test_commit_id_task$repo" => 86400 );
 	$self->update_log( $job, \@l, "guard allowed, running job" );
 
-	$job->note( $_         => [] ) for qw( test_log error_log );
-	$job->note( last_state => "start" );
-	my $e;
+	$job->note( test_log => [] );
+	my $start_time = localtime;
+	$job->note( last_state => "$start_time start" );
 	my ($test_log) = capture_merged {
 		chdir $repo or die "cannot chdir to $repo";
 		$job->note( last_state => "changed dir" );
@@ -124,14 +126,23 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 		$job->note( last_state => "loaded cpan index" );
 		CPAN::clean(".");
 		$job->note( last_state => "cleaned" );
-		eval { CPAN::install(".") };
-		$e = $@;
+		my $proc = Mojo::IOLoop::Subprocess->new;
+		Mojo::IOLoop->timer(
+			$c->{timeout} || 3600 => sub {
+				return if not $proc->pid;
+				say localtime . " Timeout reached, killing subprocesses";
+				killfam "TERM", $proc->pid;
+			}
+		);
+		$proc->run_p( sub { CPAN::install("."); CPAN::Shell->failed } )
+		  ->then( sub (@res) { say "Subprocess result: @res" } )
+		  ->catch( sub (@err) { say "Subprocess error: @err" } )
+		  ->wait;
 		$job->note( last_state => "installed" );
 	};
-	$job->note( test_log  => [ split /\n/, $test_log ] );
-	$job->note( error_log => [ split /\n/, $e // "" ] );
-	my ($fail_list) = capture_merged { CPAN::Shell->failed };
-	my ( $meth, $res ) = ( !$e and $fail_list =~ /Nothing failed in this session/ )    #
+	$test_log = "start: $start_time\n$test_log";
+	$job->note( test_log => [ split /\n/, $test_log ] );
+	my ( $meth, $res ) = ( $test_log =~ /Result: PASS/ and $test_log !~ /Result: FAIL/ )    #
 	  ? qw( finish PASS ) : qw( fail FAIL );
 	$m->enqueue( send_email_task => [ $repo, $res, $test_log, $commit_id ] );
 	$job->$meth($res);

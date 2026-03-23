@@ -20,6 +20,7 @@ version 1.250721
                           ["/path/to", {path=>"/path/to", remote => "outer"}],
         keep_files  =>    # regex to keep in the repositories between test runs
                           "etc/config.yml",
+        timeout => 3600,  # how many seconds a test run can take, defaults to 3600
         fetch_secs => 60, # how often to check for new commits, defaults to 60
         email      => 'email_we_send_from@example.com',
     }
