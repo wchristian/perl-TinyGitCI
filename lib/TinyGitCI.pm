@@ -32,6 +32,8 @@ use TinyGitCI::Repo;
                           ['asdf'],
         repos       =>    # repositories to watch and test, string or hash
                           ["/path/to", {path=>"/path/to", remote => "outer"}],
+        keep_files  =>    # regex to keep in the repositories between test runs
+                          "etc/config.yml",
         fetch_secs => 60, # how often to check for new commits, defaults to 60
         email      => 'email_we_send_from@example.com',
     }
@@ -109,7 +111,10 @@ sub test_commit_id_task( $self, $job, $repo, $commit_id ) {
 	my ($test_log) = capture_merged {
 		chdir $repo or die "cannot chdir to $repo";
 		$job->note( last_state => "changed dir" );
-		Git::Wrapper->new($repo)->checkout($commit_id);
+		my $git = Git::Wrapper->new($repo);
+		$git->checkout($commit_id);
+		my $c = $self->config;
+		$git->clean( { d => 1, f => 1, x => 1, ( e => $c->{keep_files} ) x !!$c->{keep_files} } );
 		$job->note( last_state => "checked out commit" );
 		$ENV{HARNESS_VERBOSE} = $ENV{AUTOMATED_TESTING} = $ENV{PERL_MM_USE_DEFAULT} = 1;
 		require CPAN;    # must be loaded after fork

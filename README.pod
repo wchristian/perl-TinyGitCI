@@ -18,6 +18,8 @@ version 1.250721
                           ['asdf'],
         repos       =>    # repositories to watch and test, string or hash
                           ["/path/to", {path=>"/path/to", remote => "outer"}],
+        keep_files  =>    # regex to keep in the repositories between test runs
+                          "etc/config.yml",
         fetch_secs => 60, # how often to check for new commits, defaults to 60
         email      => 'email_we_send_from@example.com',
     }
